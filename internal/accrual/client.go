@@ -13,21 +13,21 @@ import (
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-// AccrualResponse представляет ответ от системы начислений.
+// AccrualResponse представляет ответ от системы начислений
 type AccrualResponse struct {
 	Order   string  `json:"order"`
 	Status  string  `json:"status"`
 	Accrual float64 `json:"accrual,omitempty"`
 }
 
-// Client для взаимодействия с системой начислений.
+// Client для взаимодействия с системой начислений
 type Client struct {
 	address string
 	db      *database.Storage
 	client  http.Client
 }
 
-// NewClient создаёт новый клиент для системы начислений.
+// NewClient создаёт новый клиент для системы начислений
 func NewClient(address string, db *database.Storage) *Client {
 	return &Client{
 		address: address,
@@ -36,7 +36,7 @@ func NewClient(address string, db *database.Storage) *Client {
 	}
 }
 
-// StartPolling запускает периодический опрос системы начислений.
+// StartPolling запускает периодический опрос системы начислений
 func (c *Client) StartPolling(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()

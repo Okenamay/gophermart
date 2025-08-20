@@ -5,16 +5,14 @@ import (
 	"time"
 )
 
-// --- МОДЕЛИ ---
-
-// User представляет модель пользователя в базе данных.
+// User представляет модель пользователя в базе данных
 type User struct {
 	ID           int
 	Login        string
 	PasswordHash string
 }
 
-// Order представляет модель заказа в базе данных.
+// Order представляет модель заказа в базе данных
 type Order struct {
 	ID         int
 	UserID     int
@@ -24,7 +22,7 @@ type Order struct {
 	UploadedAt time.Time
 }
 
-// Withdrawal представляет модель списания в базе данных.
+// Withdrawal представляет модель списания в базе данных
 type Withdrawal struct {
 	ID          int
 	UserID      int
@@ -33,14 +31,13 @@ type Withdrawal struct {
 	ProcessedAt time.Time
 }
 
-// Balance представляет баланс пользователя, рассчитанный из БД.
+// Balance представляет баланс пользователя, рассчитанный из БД
 type Balance struct {
 	Current   float64
 	Withdrawn float64
 }
 
-// --- ОШИБКИ ---
-
+// Кастомные ошибки
 var (
 	ErrLoginConflict      = errors.New("login already exists")
 	ErrUserNotFound       = errors.New("user not found")

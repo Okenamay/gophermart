@@ -11,7 +11,7 @@ import (
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-// AddOrder обрабатывает загрузку номера заказа.
+// AddOrder обрабатывает загрузку номера заказа
 func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
@@ -55,7 +55,7 @@ func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// ListOrders возвращает список заказов пользователя.
+// ListOrders возвращает список заказов пользователя
 func (h *Handler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {

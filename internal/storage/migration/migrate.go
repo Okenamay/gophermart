@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// MigrateLauncher запускает процесс миграции или отката.
+// MigrateLauncher запускает процесс миграции или отката
 func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
 	if conf.MigrateID == "" {
 		logger.Zap.Info("Migration ID is not provided. Skipping.")

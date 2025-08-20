@@ -9,7 +9,6 @@ import (
 
 var Zap *zap.SugaredLogger
 
-// InitLogger initializes the global logger.
 func InitLogger() error {
 	logger, err := zap.NewProduction()
 	if err != nil {
@@ -20,12 +19,10 @@ func InitLogger() error {
 }
 
 type (
-	// responseData captures details about the HTTP response.
 	responseData struct {
 		status int
 		size   int
 	}
-	// loggingResponseWriter wraps http.ResponseWriter to capture status and size.
 	loggingResponseWriter struct {
 		http.ResponseWriter
 		responseData *responseData
@@ -43,7 +40,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
-// WithLogging is a middleware that logs details about each HTTP request.
+// WithLogging - middleware для логиррования HTTP запросов
 func WithLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

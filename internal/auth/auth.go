@@ -9,13 +9,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// claims определяет структуру JWT claims.
+// claims определяет структуру JWT claims
 type claims struct {
 	jwt.RegisteredClaims
-	UserID int // Используем int, как в схеме БД
+	UserID int
 }
 
-// BuildJWTString создает новый JWT токен для указанного ID пользователя.
+// BuildJWTString создает новый JWT токен для указанного ID пользователя
 func BuildJWTString(conf *config.Cfg, userID int) (string, error) {
 	tokenExp := time.Duration(conf.TokenExpiry) * time.Hour
 
@@ -34,7 +34,7 @@ func BuildJWTString(conf *config.Cfg, userID int) (string, error) {
 	return tokenString, nil
 }
 
-// GetUserIDFromToken парсит строку токена и возвращает ID пользователя.
+// GetUserIDFromToken парсит строку токена и возвращает ID пользователя
 func GetUserIDFromToken(conf *config.Cfg, tokenString string) (int, error) {
 	claims := &claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
@@ -55,13 +55,13 @@ func GetUserIDFromToken(conf *config.Cfg, tokenString string) (int, error) {
 	return claims.UserID, nil
 }
 
-// HashPassword генерирует bcrypt-хеш для пароля.
+// HashPassword генерирует bcrypt-хеш для пароля
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	return string(bytes), err
 }
 
-// CheckPasswordHash сравнивает пароль и его хеш.
+// CheckPasswordHash сравнивает пароль и его хеш
 func CheckPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil

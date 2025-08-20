@@ -2,14 +2,14 @@ package migration
 
 import "github.com/Okenamay/gophermart/internal/config"
 
-// MigrationEntry описывает одну миграцию.
+// MigrationEntry описывает миграцию
 type MigrationEntry struct {
 	ID      string
 	UpSQL   string
 	DownSQL string
 }
 
-// migrations содержит все доступные миграции для приложения.
+// migrations содержит все доступные миграции
 var migrations = map[string]MigrationEntry{
 	"20250820000000": {
 		ID: "20250820000000",
@@ -49,7 +49,7 @@ var migrations = map[string]MigrationEntry{
 	},
 }
 
-// DeliverMigration находит и возвращает миграцию по её ID.
+// DeliverMigration находит и возвращает миграцию по её ID
 func DeliverMigration(conf *config.Cfg) MigrationEntry {
 	return migrations[conf.MigrateID]
 }

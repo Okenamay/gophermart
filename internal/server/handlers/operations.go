@@ -11,7 +11,7 @@ import (
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-// PointsWithdraw обрабатывает запрос на списание баллов.
+// PointsWithdraw обрабатывает запрос на списание баллов
 func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
@@ -33,7 +33,7 @@ func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.CreateWithdrawal(r.Context(), userID, req.Order, req.Sum)
 	if err != nil {
 		if errors.Is(err, database.ErrInsufficientFunds) {
-			http.Error(w, "Insufficient funds", http.StatusPaymentRequired) // 402
+			http.Error(w, "Insufficient funds", http.StatusPaymentRequired)
 			return
 		}
 		logger.Zap.Errorw("Failed to create withdrawal", "userID", userID, "error", err)
@@ -44,7 +44,7 @@ func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// ListWithdrawals возвращает историю списаний пользователя.
+// ListWithdrawals возвращает историю списаний пользователя
 func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
@@ -55,7 +55,7 @@ func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	withdrawalsDB, err := h.DB.GetWithdrawalsByUser(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, database.ErrNoWithdrawalsFound) {
-			w.WriteHeader(http.StatusNoContent) // 204
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		logger.Zap.Errorw("Failed to get withdrawals", "userID", userID, "error", err)

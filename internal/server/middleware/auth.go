@@ -12,10 +12,10 @@ import (
 
 type contextKey string
 
-// UserIDContextKey - ключ для доступа к ID пользователя в контексте запроса.
+// UserIDContextKey - ключ для доступа к ID пользователя в контексте запроса
 const UserIDContextKey = contextKey("userID")
 
-// Authenticator - middleware для проверки JWT-токена.
+// Authenticator - middleware для проверки JWT-токена
 func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Сохраняем ID пользователя в контексте для последующих обработчиков
+			// Сохраняем ID пользователя в контексте для последующих хендлеров
 			ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

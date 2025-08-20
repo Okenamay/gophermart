@@ -12,21 +12,21 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Launch запускает HTTP-сервер и настраивает маршруты.
+// Launch запускает HTTP-сервер и настраивает маршруты
 func Launch(conf *config.Cfg, db *database.Storage) error {
 	r := chi.NewRouter()
 
 	// Подключаем middleware для логирования
 	r.Use(logger.WithLogging)
 
-	// --- Публичные маршруты ---
+	// Публичные маршруты
 	r.Group(func(r chi.Router) {
 		h := handlers.New(conf, db)
 		r.Post("/api/user/register", h.RegisterUser)
 		r.Post("/api/user/login", h.LoginUser)
 	})
 
-	// --- Защищённые маршруты ---
+	// Защищённые маршруты
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticator(conf))
 		h := handlers.New(conf, db)

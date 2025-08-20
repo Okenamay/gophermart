@@ -24,7 +24,7 @@ const (
 	DBReinit = false
 )
 
-// Cfg определяет структуру конфигурации.
+// Cfg определяет структуру конфигурации
 type Cfg struct {
 	RunAddress       string
 	DatabaseURI      string
@@ -68,7 +68,7 @@ func parseFlags() *Cfg {
 		config.MigrateDirection = migDir
 	}
 
-	// Устанавливаем значения по умолчанию, если они не были переопределены
+	// Устанавливаем значения по умолчанию, т.к. флаги и env не определены
 	config.IdleTimeout = IdleTimeout
 	config.TokenExpiry = TokenExp
 	config.AuthorizationKey = AuthKey
@@ -76,7 +76,7 @@ func parseFlags() *Cfg {
 	return config
 }
 
-// InitConfig инициализирует конфигурацию синглтоном.
+// InitConfig инициализирует конфигурацию синглтоном
 func InitConfig() *Cfg {
 	var (
 		once   sync.Once

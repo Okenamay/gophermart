@@ -14,12 +14,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Storage инкапсулирует пул соединений с БД.
+// Storage инкапсулирует пул соединений с БД
 type Storage struct {
 	DBPool *pgxpool.Pool
 }
 
-// New инициализирует подключение к базе данных, выполняет реинициализацию или миграции.
+// New инициализирует подключение к базе данных, выполняет реинициализацию или миграции
 func New(ctx context.Context, conf *config.Cfg) (*Storage, error) {
 	logger.Zap.Info("Initializing database connection")
 	pool, err := pgxpool.New(ctx, conf.DatabaseURI)
@@ -33,7 +33,7 @@ func New(ctx context.Context, conf *config.Cfg) (*Storage, error) {
 	}
 	logger.Zap.Info("Database connection established successfully")
 
-	// Проверяем, существует ли схема, и создаем ее, если необходимо.
+	// Проверяем, существует ли схема, и создаем ее, если необходимо
 	schemaExists, err := storage.checkSchema(ctx)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func New(ctx context.Context, conf *config.Cfg) (*Storage, error) {
 	return storage, nil
 }
 
-// checkSchema проверяет наличие основной таблицы 'users' в БД.
+// checkSchema проверяет наличие основной таблицы 'users' в БД
 func (s *Storage) checkSchema(ctx context.Context) (bool, error) {
 	var exists bool
 	query := "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename  = 'users');"
@@ -70,9 +70,7 @@ func (s *Storage) checkSchema(ctx context.Context) (bool, error) {
 	return exists, nil
 }
 
-// --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ ---
-
-// CreateUser создает нового пользователя в базе данных.
+// CreateUser создает нового пользователя в базе данных
 func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (int, error) {
 	var userID int
 	err := s.DBPool.QueryRow(ctx,
@@ -96,7 +94,7 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (i
 	return userID, nil
 }
 
-// GetUserByLogin находит пользователя по логину.
+// GetUserByLogin находит пользователя по логину
 func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*User, error) {
 	user := &User{Login: login}
 	err := s.DBPool.QueryRow(ctx,
@@ -112,9 +110,7 @@ func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*User, erro
 	return user, nil
 }
 
-// --- ФУНКЦИИ ДЛЯ РАБОТЫ С ЗАКАЗАМИ ---
-
-// CreateOrder сохраняет новый заказ в БД.
+// CreateOrder сохраняет новый заказ в БД
 func (s *Storage) CreateOrder(ctx context.Context, userID int, orderNumber string) error {
 	_, err := s.DBPool.Exec(ctx,
 		"INSERT INTO orders (user_id, number) VALUES ($1, $2)",
@@ -130,7 +126,7 @@ func (s *Storage) CreateOrder(ctx context.Context, userID int, orderNumber strin
 	return nil
 }
 
-// GetOrderByNumber получает заказ по его номеру.
+// GetOrderByNumber получает заказ по его номеру
 func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*Order, error) {
 	order := &Order{Number: number}
 	err := s.DBPool.QueryRow(ctx,
@@ -146,7 +142,7 @@ func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*Order, 
 	return order, nil
 }
 
-// GetOrdersByUser получает все заказы пользователя, отсортированные по времени загрузки.
+// GetOrdersByUser получает все заказы пользователя, отсортированные по времени загрузки
 func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]Order, error) {
 	rows, err := s.DBPool.Query(ctx,
 		"SELECT number, status, accrual, uploaded_at FROM orders WHERE user_id = $1 ORDER BY uploaded_at ASC",
@@ -179,7 +175,7 @@ func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]Order, err
 	return orders, nil
 }
 
-// GetUnprocessedOrders получает заказы со статусами NEW или PROCESSING.
+// GetUnprocessedOrders получает заказы со статусами NEW или PROCESSING
 func (s *Storage) GetUnprocessedOrders(ctx context.Context) ([]Order, error) {
 	rows, err := s.DBPool.Query(ctx,
 		"SELECT id, number FROM orders WHERE status IN ('NEW', 'PROCESSING')")
@@ -211,7 +207,7 @@ func (s *Storage) GetUnprocessedOrders(ctx context.Context) ([]Order, error) {
 	return orders, nil
 }
 
-// UpdateOrder обновляет статус и сумму начисления для заказа.
+// UpdateOrder обновляет статус и сумму начисления для заказа
 func (s *Storage) UpdateOrder(ctx context.Context, number, status string, accrual float64) error {
 	res, err := s.DBPool.Exec(ctx,
 		"UPDATE orders SET status = $1, accrual = $2 WHERE number = $3",
@@ -226,9 +222,7 @@ func (s *Storage) UpdateOrder(ctx context.Context, number, status string, accrua
 	return nil
 }
 
-// --- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЛАНСОМ И СПИСАНИЯМИ ---
-
-// GetUserBalance рассчитывает текущий и списанный баланс пользователя.
+// GetUserBalance рассчитывает текущий и списанный баланс пользователя
 func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, error) {
 	var totalAccrual float64
 	err := s.DBPool.QueryRow(ctx,
@@ -254,7 +248,7 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 	}, nil
 }
 
-// CreateWithdrawal создает запись о списании в транзакции, проверяя баланс.
+// CreateWithdrawal создает запись о списании в транзакции, проверяя баланс
 func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber string, sum float64) error {
 	tx, err := s.DBPool.Begin(ctx)
 	if err != nil {
@@ -284,7 +278,7 @@ func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber 
 	return tx.Commit(ctx)
 }
 
-// getUserBalanceInTx - вспомогательная функция для получения баланса внутри транзакции.
+// getUserBalanceInTx - вспомогательная функция для получения баланса внутри транзакции
 func (s *Storage) getUserBalanceInTx(ctx context.Context, tx pgx.Tx, userID int) (*Balance, error) {
 	var totalAccrual, totalWithdrawn float64
 	err := tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&totalAccrual)
@@ -300,7 +294,7 @@ func (s *Storage) getUserBalanceInTx(ctx context.Context, tx pgx.Tx, userID int)
 	return &Balance{Current: totalAccrual - totalWithdrawn, Withdrawn: totalWithdrawn}, nil
 }
 
-// GetWithdrawalsByUser получает историю списаний пользователя.
+// GetWithdrawalsByUser получает историю списаний пользователя
 func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withdrawal, error) {
 	rows, err := s.DBPool.Query(ctx,
 		"SELECT order_number, sum, processed_at FROM withdrawals WHERE user_id = $1 ORDER BY processed_at ASC",
@@ -333,9 +327,7 @@ func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withd
 	return withdrawals, nil
 }
 
-// --- СЛУЖЕБНЫЕ ФУНКЦИИ БД ---
-
-// reinitialize полностью удаляет и воссоздаёт структуру таблиц в БД.
+// reinitialize полностью удаляет и воссоздаёт структуру таблиц в БД
 func (s *Storage) reinitialize(ctx context.Context) error {
 	logger.Zap.Info("Starting database re-initialization")
 	sql := `
@@ -354,7 +346,7 @@ func (s *Storage) reinitialize(ctx context.Context) error {
 	return nil
 }
 
-// Ping проверяет доступность базы данных.
+// Ping проверяет доступность базы данных
 func (s *Storage) Ping(ctx context.Context) error {
 	logger.Zap.Info("Pinging database")
 	if s.DBPool == nil {
@@ -370,7 +362,7 @@ func (s *Storage) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Close закрывает пул соединений с базой данных.
+// Close закрывает пул соединений с базой данных
 func (s *Storage) Close() {
 	if s.DBPool != nil {
 		s.DBPool.Close()

@@ -8,7 +8,7 @@ import (
 	"github.com/Okenamay/gophermart/internal/server/middleware"
 )
 
-// PointsBalance возвращает текущий баланс пользователя.
+// PointsBalance возвращает текущий баланс пользователя
 func (h *Handler) PointsBalance(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {

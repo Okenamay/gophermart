@@ -10,7 +10,7 @@ import (
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-// RegisterUser handles the registration of a new user.
+// RegisterUser осуществляет регистрацию нового пользователя
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	var creds UserCredentials
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
@@ -52,7 +52,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// LoginUser handles user authentication.
+// LoginUser осуществляет авторизацию пользователей
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	var creds UserCredentials
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
