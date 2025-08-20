@@ -32,18 +32,42 @@ func New(ctx context.Context, conf *config.Cfg) (*Storage, error) {
 		return nil, err
 	}
 	logger.Zap.Info("Database connection established successfully")
-	if conf.DBReinitialize {
-		logger.Zap.Warn("DBReinitialize flag is set. Re-creating database schema.")
+
+	// Проверяем, существует ли схема, и создаем ее, если необходимо.
+	schemaExists, err := storage.checkSchema(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if conf.DBReinitialize || !schemaExists {
+		if !schemaExists {
+			logger.Zap.Warn("Database schema not found. Forcing re-initialization.")
+		} else {
+			logger.Zap.Warn("DBReinitialize flag is set. Re-creating database schema.")
+		}
 		if err := storage.reinitialize(ctx); err != nil {
 			return nil, err
 		}
 	}
+
 	if conf.MigrateID != "" {
 		if err := migration.MigrateLauncher(ctx, storage.DBPool, conf); err != nil {
 			return nil, err
 		}
 	}
 	return storage, nil
+}
+
+// checkSchema проверяет наличие основной таблицы 'users' в БД.
+func (s *Storage) checkSchema(ctx context.Context) (bool, error) {
+	var exists bool
+	query := "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename  = 'users');"
+	err := s.DBPool.QueryRow(ctx, query).Scan(&exists)
+	if err != nil {
+		logger.Zap.Errorw("Failed to check database schema", "error", err)
+		return false, err
+	}
+	return exists, nil
 }
 
 // --- ФУНКЦИИ ДЛЯ РАБОТЫ С ПОЛЬЗОВАТЕЛЯМИ ---

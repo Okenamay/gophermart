@@ -35,7 +35,7 @@ func main() {
 		logger.Zap.Warn("ACCRUAL_SYSTEM_ADDRESS is not set. Accrual polling is disabled.")
 	}
 
-	logger.Zap.Info("Starting server", "address", conf.RunAddress)
+	logger.Zap.Infow("Starting server", "address", conf.RunAddress)
 
 	// Передаём зависимость от БД в роутер
 	err = router.Launch(conf, db)
