@@ -38,7 +38,6 @@ func New(ctx context.Context, conf *config.Cfg) (*Storage, error) {
 			return nil, err
 		}
 	}
-	// Запускаем миграции из нового расположения
 	if conf.MigrateID != "" {
 		if err := migration.MigrateLauncher(ctx, storage.DBPool, conf); err != nil {
 			return nil, err
@@ -208,7 +207,6 @@ func (s *Storage) UpdateOrder(ctx context.Context, number, status string, accrua
 // GetUserBalance рассчитывает текущий и списанный баланс пользователя.
 func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, error) {
 	var totalAccrual float64
-	// Суммируем все подтвержденные начисления
 	err := s.DBPool.QueryRow(ctx,
 		"SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'",
 		userID).Scan(&totalAccrual)
@@ -218,7 +216,6 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 	}
 
 	var totalWithdrawn float64
-	// Суммируем все списания
 	err = s.DBPool.QueryRow(ctx,
 		"SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1",
 		userID).Scan(&totalWithdrawn)
@@ -237,38 +234,46 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber string, sum float64) error {
 	tx, err := s.DBPool.Begin(ctx)
 	if err != nil {
+		logger.Zap.Errorw("Failed to begin transaction", "error", err)
 		return err
 	}
-	defer tx.Rollback(ctx) // Откатываем транзакцию, если что-то пошло не так
+	defer tx.Rollback(ctx)
 
-	// 1. Получаем текущий баланс внутри транзакции
-	var totalAccrual, totalWithdrawn float64
-	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&totalAccrual)
+	balance, err := s.getUserBalanceInTx(ctx, tx, userID)
 	if err != nil {
-		return err
-	}
-	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&totalWithdrawn)
-	if err != nil {
+		// Логирование происходит внутри getUserBalanceInTx
 		return err
 	}
 
-	currentBalance := totalAccrual - totalWithdrawn
-
-	// 2. Проверяем, достаточно ли средств
-	if currentBalance < sum {
+	if balance.Current < sum {
 		return ErrInsufficientFunds
 	}
 
-	// 3. Если средств достаточно, создаем запись о списании
 	_, err = tx.Exec(ctx,
 		"INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)",
 		userID, orderNumber, sum)
 	if err != nil {
+		logger.Zap.Errorw("Failed to insert withdrawal in transaction", "userID", userID, "error", err)
 		return err
 	}
 
-	// 4. Подтверждаем транзакцию
 	return tx.Commit(ctx)
+}
+
+// getUserBalanceInTx - вспомогательная функция для получения баланса внутри транзакции.
+func (s *Storage) getUserBalanceInTx(ctx context.Context, tx pgx.Tx, userID int) (*Balance, error) {
+	var totalAccrual, totalWithdrawn float64
+	err := tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&totalAccrual)
+	if err != nil {
+		logger.Zap.Errorw("Failed to calculate total accrual in transaction", "userID", userID, "error", err)
+		return nil, err
+	}
+	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&totalWithdrawn)
+	if err != nil {
+		logger.Zap.Errorw("Failed to calculate total withdrawn in transaction", "userID", userID, "error", err)
+		return nil, err
+	}
+	return &Balance{Current: totalAccrual - totalWithdrawn, Withdrawn: totalWithdrawn}, nil
 }
 
 // GetWithdrawalsByUser получает историю списаний пользователя.
@@ -310,36 +315,11 @@ func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withd
 func (s *Storage) reinitialize(ctx context.Context) error {
 	logger.Zap.Info("Starting database re-initialization")
 	sql := `
-        DROP TABLE IF EXISTS withdrawals;
-        DROP TABLE IF EXISTS orders;
-        DROP TABLE IF EXISTS users;
-        DROP TYPE IF EXISTS order_status;
-
+        DROP TABLE IF EXISTS withdrawals; DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS users; DROP TYPE IF EXISTS order_status;
         CREATE TYPE order_status AS ENUM ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');
-
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            login VARCHAR(255) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS orders (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            number VARCHAR(255) UNIQUE NOT NULL,
-            status order_status NOT NULL DEFAULT 'NEW',
-            accrual NUMERIC(10, 2),
-            uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-
-        CREATE TABLE IF NOT EXISTS withdrawals (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(id),
-            order_number VARCHAR(255) NOT NULL,
-            sum NUMERIC(10, 2) NOT NULL,
-            processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
+        CREATE TABLE users (id SERIAL PRIMARY KEY, login VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+        CREATE TABLE orders (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), number VARCHAR(255) UNIQUE NOT NULL, status order_status NOT NULL DEFAULT 'NEW', accrual NUMERIC(10, 2), uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+        CREATE TABLE withdrawals (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), order_number VARCHAR(255) NOT NULL, sum NUMERIC(10, 2) NOT NULL, processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
     `
 	_, err := s.DBPool.Exec(ctx, sql)
 	if err != nil {
