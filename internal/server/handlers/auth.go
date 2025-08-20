@@ -2,57 +2,87 @@ package handlers
 
 import (
 	"encoding/json"
-	"io"
+	"errors"
 	"net/http"
 
-	"github.com/Okenamay/gophermart/internal/config"
+	"github.com/Okenamay/gophermart/internal/auth"
 	logger "github.com/Okenamay/gophermart/internal/logger/zap"
+	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-// RegUser обрабатывает регистрацию нового пользователя.
-func RegUser(conf *config.Cfg) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("RegUser handler started")
+// RegisterUser handles the registration of a new user.
+func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	var creds UserCredentials
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
 
-		var creds UserCredentials
-		if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+	if creds.Login == "" || creds.Password == "" {
+		http.Error(w, "Login and password must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	passwordHash, err := auth.HashPassword(creds.Password)
+	if err != nil {
+		logger.Zap.Errorw("Failed to hash password", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	userID, err := h.DB.CreateUser(r.Context(), creds.Login, passwordHash)
+	if err != nil {
+		if errors.Is(err, database.ErrLoginConflict) {
+			http.Error(w, "Login already exists", http.StatusConflict)
 			return
 		}
-
-		// TODO: Добавить логику сохранения пользователя в БД.
-		// 1. Проверить, что логин не занят (вернуть 409 Conflict).
-		// 2. Захешировать пароль.
-		// 3. Сохранить пользователя.
-		// 4. Сгенерировать JWT и установить его в заголовок Authorization или cookie.
-
-		w.Header().Set("Content-Type", "application/json")
-		// Пример успешного ответа
-		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{"message": "user registered and authenticated"}`)
+		logger.Zap.Errorw("Failed to create user in DB", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
+
+	token, err := auth.BuildJWTString(h.Config, userID)
+	if err != nil {
+		logger.Zap.Errorw("Failed to build JWT", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
 }
 
-// LoginUser обрабатывает аутентификацию пользователя.
-func LoginUser(conf *config.Cfg) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("LoginUser handler started")
+// LoginUser handles user authentication.
+func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	var creds UserCredentials
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
 
-		var creds UserCredentials
-		if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
+	user, err := h.DB.GetUserByLogin(r.Context(), creds.Login)
+	if err != nil {
+		if errors.Is(err, database.ErrUserNotFound) {
+			http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 			return
 		}
-
-		// TODO: Добавить логику аутентификации.
-		// 1. Найти пользователя по логину.
-		// 2. Сравнить хеш пароля.
-		// 3. Если всё верно (вернуть 200 OK), сгенерировать JWT и установить его.
-		// 4. Если пара логин/пароль неверна, вернуть 401 Unauthorized.
-
-		w.Header().Set("Content-Type", "application/json")
-		// Пример успешного ответа
-		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{"message": "user authenticated"}`)
+		logger.Zap.Errorw("Failed to get user from DB", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
+
+	if !auth.CheckPasswordHash(creds.Password, user.PasswordHash) {
+		http.Error(w, "Invalid login or password", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.BuildJWTString(h.Config, user.ID)
+	if err != nil {
+		logger.Zap.Errorw("Failed to build JWT", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
 }

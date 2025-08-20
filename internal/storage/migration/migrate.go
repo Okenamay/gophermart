@@ -11,8 +11,6 @@ import (
 
 // MigrateLauncher запускает процесс миграции или отката.
 func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
-	logger.Zap.Info("Migration launcher started")
-
 	if conf.MigrateID == "" {
 		logger.Zap.Info("Migration ID is not provided. Skipping.")
 		return nil
@@ -25,7 +23,6 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 
 	migration := DeliverMigration(conf)
 	if migration.ID == "" {
-		logger.Zap.Warnw("Unknown migration ID", "id", conf.MigrateID)
 		return fmt.Errorf("unknown migration ID: %s", conf.MigrateID)
 	}
 
@@ -41,7 +38,6 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 			return err
 		}
 		logger.Zap.Infow("Successfully applied migration", "id", migration.ID)
-
 	case "down":
 		sql = migration.DownSQL
 		_, err = dbpool.Exec(ctx, sql)
@@ -50,9 +46,7 @@ func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg
 			return err
 		}
 		logger.Zap.Infow("Successfully applied rollback", "id", migration.ID)
-
 	default:
-		logger.Zap.Warnw("Incorrect migration direction", "direction", conf.MigrateDirection)
 		return fmt.Errorf("incorrect migration direction: %s", conf.MigrateDirection)
 	}
 

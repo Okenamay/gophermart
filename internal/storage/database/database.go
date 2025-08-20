@@ -203,6 +203,107 @@ func (s *Storage) UpdateOrder(ctx context.Context, number, status string, accrua
 	return nil
 }
 
+// --- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЛАНСОМ И СПИСАНИЯМИ ---
+
+// GetUserBalance рассчитывает текущий и списанный баланс пользователя.
+func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, error) {
+	var totalAccrual float64
+	// Суммируем все подтвержденные начисления
+	err := s.DBPool.QueryRow(ctx,
+		"SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'",
+		userID).Scan(&totalAccrual)
+	if err != nil {
+		logger.Zap.Errorw("Failed to calculate total accrual", "userID", userID, "error", err)
+		return nil, err
+	}
+
+	var totalWithdrawn float64
+	// Суммируем все списания
+	err = s.DBPool.QueryRow(ctx,
+		"SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1",
+		userID).Scan(&totalWithdrawn)
+	if err != nil {
+		logger.Zap.Errorw("Failed to calculate total withdrawn", "userID", userID, "error", err)
+		return nil, err
+	}
+
+	return &Balance{
+		Current:   totalAccrual - totalWithdrawn,
+		Withdrawn: totalWithdrawn,
+	}, nil
+}
+
+// CreateWithdrawal создает запись о списании в транзакции, проверяя баланс.
+func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber string, sum float64) error {
+	tx, err := s.DBPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) // Откатываем транзакцию, если что-то пошло не так
+
+	// 1. Получаем текущий баланс внутри транзакции
+	var totalAccrual, totalWithdrawn float64
+	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&totalAccrual)
+	if err != nil {
+		return err
+	}
+	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&totalWithdrawn)
+	if err != nil {
+		return err
+	}
+
+	currentBalance := totalAccrual - totalWithdrawn
+
+	// 2. Проверяем, достаточно ли средств
+	if currentBalance < sum {
+		return ErrInsufficientFunds
+	}
+
+	// 3. Если средств достаточно, создаем запись о списании
+	_, err = tx.Exec(ctx,
+		"INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)",
+		userID, orderNumber, sum)
+	if err != nil {
+		return err
+	}
+
+	// 4. Подтверждаем транзакцию
+	return tx.Commit(ctx)
+}
+
+// GetWithdrawalsByUser получает историю списаний пользователя.
+func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withdrawal, error) {
+	rows, err := s.DBPool.Query(ctx,
+		"SELECT order_number, sum, processed_at FROM withdrawals WHERE user_id = $1 ORDER BY processed_at ASC",
+		userID)
+	if err != nil {
+		logger.Zap.Errorw("Failed to query user withdrawals", "userID", userID, "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var withdrawals []Withdrawal
+	for rows.Next() {
+		var w Withdrawal
+		if err := rows.Scan(&w.OrderNumber, &w.Sum, &w.ProcessedAt); err != nil {
+			logger.Zap.Errorw("Failed to scan withdrawal row", "userID", userID, "error", err)
+			return nil, err
+		}
+		withdrawals = append(withdrawals, w)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.Zap.Errorw("Error iterating withdrawals rows", "userID", userID, "error", err)
+		return nil, err
+	}
+
+	if len(withdrawals) == 0 {
+		return nil, ErrNoWithdrawalsFound
+	}
+
+	return withdrawals, nil
+}
+
 // --- СЛУЖЕБНЫЕ ФУНКЦИИ БД ---
 
 // reinitialize полностью удаляет и воссоздаёт структуру таблиц в БД.

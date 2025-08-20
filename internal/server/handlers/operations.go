@@ -2,66 +2,77 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	"time"
 
-	"github.com/Okenamay/gophermart/internal/config"
 	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/Okenamay/gophermart/internal/luhn"
+	"github.com/Okenamay/gophermart/internal/server/middleware"
+	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
 // PointsWithdraw обрабатывает запрос на списание баллов.
-func PointsWithdraw(conf *config.Cfg) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("PointsWithdraw handler started")
-
-		var req WithdrawalRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
-			return
-		}
-
-		if !luhn.IsValidString(req.Order) {
-			http.Error(w, "Invalid order number format", http.StatusUnprocessableEntity)
-			return
-		}
-
-		// TODO: Добавить логику списания.
-		// 1. Получить userID из контекста.
-		// 2. Проверить баланс пользователя.
-		// 3. Если средств недостаточно, вернуть 402 Payment Required.
-		// 4. Сохранить операцию списания в БД.
-
-		w.WriteHeader(http.StatusOK)
+func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
+
+	var req WithdrawalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	if !luhn.IsValidString(req.Order) {
+		http.Error(w, "Invalid order number format", http.StatusUnprocessableEntity)
+		return
+	}
+
+	err := h.DB.CreateWithdrawal(r.Context(), userID, req.Order, req.Sum)
+	if err != nil {
+		if errors.Is(err, database.ErrInsufficientFunds) {
+			http.Error(w, "Insufficient funds", http.StatusPaymentRequired) // 402
+			return
+		}
+		logger.Zap.Errorw("Failed to create withdrawal", "userID", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // ListWithdrawals возвращает историю списаний пользователя.
-func ListWithdrawals(conf *config.Cfg) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Zap.Info("ListWithdrawals handler started")
+func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
-		// TODO: Добавить логику получения истории списаний из БД.
-		// 1. Получить userID из контекста.
-		// 2. Получить все списания пользователя, отсортированные по времени.
-		// 3. Если списаний нет, вернуть 204 No Content.
-
-		// Пример ответа
-		withdrawals := []Withdrawal{
-			{
-				Order:       "2377225624",
-				Sum:         500,
-				ProcessedAt: time.Now().Add(-48 * time.Hour),
-			},
-		}
-
-		if len(withdrawals) == 0 {
-			w.WriteHeader(http.StatusNoContent)
+	withdrawalsDB, err := h.DB.GetWithdrawalsByUser(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, database.ErrNoWithdrawalsFound) {
+			w.WriteHeader(http.StatusNoContent) // 204
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(withdrawals)
+		logger.Zap.Errorw("Failed to get withdrawals", "userID", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
+
+	// Преобразуем модель БД в модель API
+	withdrawalsAPI := make([]Withdrawal, len(withdrawalsDB))
+	for i, w := range withdrawalsDB {
+		withdrawalsAPI[i] = Withdrawal{
+			Order:       w.OrderNumber,
+			Sum:         w.Sum,
+			ProcessedAt: w.ProcessedAt,
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(withdrawalsAPI)
 }

@@ -20,17 +20,16 @@ func main() {
 	conf := config.InitConfig()
 	ctx := context.Background()
 
-	// Инициализация хранилища из нового пакета
+	// Инициализация хранилища
 	db, err := database.New(ctx, conf)
 	if err != nil {
 		logger.Zap.Fatalw("Failed to connect to database", "error", err)
 	}
 	defer db.Close()
 
-	// Проверяем, задан ли адрес системы начислений
 	if conf.AccrualAddress != "" {
-		// Инициализируем и запускаем клиент системы начислений
-		accrualClient := accrual.NewClient(conf.AccrualAddress /*, db*/)
+		// Передаём зависимость от БД в клиент системы начислений
+		accrualClient := accrual.NewClient(conf.AccrualAddress, db)
 		go accrualClient.StartPolling(ctx)
 	} else {
 		logger.Zap.Warn("ACCRUAL_SYSTEM_ADDRESS is not set. Accrual polling is disabled.")
@@ -38,7 +37,8 @@ func main() {
 
 	logger.Zap.Info("Starting server", "address", conf.RunAddress)
 
-	err = router.Launch(conf)
+	// Передаём зависимость от БД в роутер
+	err = router.Launch(conf, db)
 	if err != nil {
 		logger.Zap.Fatalw("Failed to start server", "error", err)
 	}

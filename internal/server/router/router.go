@@ -7,38 +7,39 @@ import (
 	"github.com/Okenamay/gophermart/internal/config"
 	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/Okenamay/gophermart/internal/server/handlers"
-	mware "github.com/Okenamay/gophermart/internal/server/middleware/auth"
-	"github.com/go-chi/chi"
+	"github.com/Okenamay/gophermart/internal/server/middleware"
+	"github.com/Okenamay/gophermart/internal/storage/database"
+	"github.com/go-chi/chi/v5"
 )
 
-// Запуск HTTP-сервера и работа с запросами:
-func Launch(conf *config.Cfg) error {
-	router := chi.NewRouter()
+// Launch запускает HTTP-сервер и настраивает маршруты.
+func Launch(conf *config.Cfg, db *database.Storage) error {
+	r := chi.NewRouter()
 
-	router.Use(logger.WithLogging)
+	// Подключаем middleware для логирования
+	r.Use(logger.WithLogging)
 
-	// Эндпоинты для регистрации и логина
-	router.Post("/api/user/register", handlers.RegUser(conf))
-	router.Post("/api/user/login", handlers.LoginUser(conf))
+	// --- Публичные маршруты ---
+	r.Group(func(r chi.Router) {
+		h := handlers.New(conf, db)
+		r.Post("/api/user/register", h.RegisterUser)
+		r.Post("/api/user/login", h.LoginUser)
+	})
 
-	router.Group(func(r chi.Router) {
-		r.Use(mware.Authenticator(conf))
-
-		// Загрузка номера заказа
-		r.Post("/api/user/orders", handlers.AddOrder(conf))
-		// Получение списка заказов
-		r.Get("/api/user/orders", handlers.ListOrders(conf))
-		// Получение баланса
-		r.Get("/api/user/balance", handlers.PointsBalance(conf))
-		// Списание баллов
-		r.Post("/api/user/balance/withdraw", handlers.PointsWithdraw(conf))
-		// Получение истории списаний
-		r.Get("/api/user/withdrawals", handlers.ListWithdrawals(conf))
+	// --- Защищённые маршруты ---
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Authenticator(conf))
+		h := handlers.New(conf, db)
+		r.Post("/api/user/orders", h.AddOrder)
+		r.Get("/api/user/orders", h.ListOrders)
+		r.Get("/api/user/balance", h.PointsBalance)
+		r.Post("/api/user/balance/withdraw", h.PointsWithdraw)
+		r.Get("/api/user/withdrawals", h.ListWithdrawals)
 	})
 
 	server := http.Server{
 		Addr:        conf.RunAddress,
-		Handler:     router,
+		Handler:     r,
 		IdleTimeout: time.Duration(conf.IdleTimeout) * time.Second,
 	}
 

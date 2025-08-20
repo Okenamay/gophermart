@@ -2,7 +2,7 @@ package luhn
 
 import "strconv"
 
-// IsValid проверяет корректность номера по алгоритму Луна.
+// IsValid checks the validity of a number using the Luhn algorithm.
 func IsValid(number int) bool {
 	return (number%10+checksum(number/10))%10 == 0
 }
@@ -23,11 +23,25 @@ func checksum(number int) int {
 	return luhn % 10
 }
 
-// IsValidString является обёрткой для IsValid для строковых номеров.
+// IsValidString is a wrapper for IsValid to check string numbers.
 func IsValidString(numStr string) bool {
-	num, err := strconv.Atoi(numStr)
-	if err != nil {
+	if _, err := strconv.Atoi(numStr); err != nil {
 		return false
 	}
-	return IsValid(num)
+
+	var sum int
+	nDigits := len(numStr)
+	parity := nDigits % 2
+
+	for i := 0; i < nDigits; i++ {
+		digit, _ := strconv.Atoi(string(numStr[i]))
+		if i%2 == parity {
+			digit *= 2
+			if digit > 9 {
+				digit -= 9
+			}
+		}
+		sum += digit
+	}
+	return sum%10 == 0
 }

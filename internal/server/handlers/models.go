@@ -8,7 +8,7 @@ type UserCredentials struct {
 	Password string `json:"password"`
 }
 
-// Order описывает структуру заказа.
+// Order описывает структуру заказа для ответа API.
 type Order struct {
 	Number     string    `json:"number"`
 	Status     string    `json:"status"`
@@ -28,7 +28,7 @@ type WithdrawalRequest struct {
 	Sum   float64 `json:"sum"`
 }
 
-// Withdrawal описывает операцию списания.
+// Withdrawal описывает операцию списания для ответа API.
 type Withdrawal struct {
 	Order       string    `json:"order"`
 	Sum         float64   `json:"sum"`

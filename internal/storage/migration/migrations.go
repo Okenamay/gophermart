@@ -14,10 +14,8 @@ var migrations = map[string]MigrationEntry{
 	"20250820000000": {
 		ID: "20250820000000",
 		UpSQL: `
-            -- Создаём пользовательский тип для статуса заказа
             CREATE TYPE order_status AS ENUM ('NEW', 'PROCESSING', 'INVALID', 'PROCESSED');
 
-            -- Таблица пользователей
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 login VARCHAR(255) UNIQUE NOT NULL,
@@ -25,7 +23,6 @@ var migrations = map[string]MigrationEntry{
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
 
-            -- Таблица заказов
             CREATE TABLE IF NOT EXISTS orders (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id),
@@ -35,7 +32,6 @@ var migrations = map[string]MigrationEntry{
                 uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
 
-            -- Таблица списаний
             CREATE TABLE IF NOT EXISTS withdrawals (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id),
@@ -51,12 +47,9 @@ var migrations = map[string]MigrationEntry{
             DROP TYPE IF EXISTS order_status;
         `,
 	},
-
-	// --- БУДУЩИЕ МИГРАЦИИ ДОБАВЛЯТЬ СЮДА ---
 }
 
-// DeliverMigration находит и возвращает миграцию по её ID из конфигурации.
+// DeliverMigration находит и возвращает миграцию по её ID.
 func DeliverMigration(conf *config.Cfg) MigrationEntry {
-	migration := migrations[conf.MigrateID]
-	return migration
+	return migrations[conf.MigrateID]
 }
