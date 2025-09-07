@@ -10,10 +10,8 @@ import (
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
-var err error
-
 func main() {
-	if err = logger.InitLogger(); err != nil {
+	if err := logger.InitLogger(); err != nil {
 		logger.Zap.Fatalw("Failed to start logger", "error", err)
 	}
 

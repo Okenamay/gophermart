@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -69,7 +69,11 @@ func (c *Client) processOrders(ctx context.Context) {
 }
 
 func (c *Client) updateOrderStatus(ctx context.Context, orderNumber string) {
-	url := fmt.Sprintf("%s/api/orders/%s", c.address, orderNumber)
+	url, err := url.JoinPath(c.address, "api", "orders", orderNumber)
+	if err != nil {
+		logger.Zap.Errorw("Failed to process URL", "error", err)
+	}
+
 	resp, err := c.client.Get(url)
 	if err != nil {
 		logger.Zap.Errorw("Failed to query accrual system", "order", orderNumber, "error", err)
