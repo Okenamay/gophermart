@@ -40,6 +40,18 @@ type Cfg struct {
 func parseFlags() *Cfg {
 	config := &Cfg{}
 
+	// Инициализируцемся дефолтными значениями:
+	config.RunAddress = runAddress
+	config.DatabaseURI = databaseURI
+	config.AccrualAddress = accrualAddress
+	config.DBReinitialize = dbReinit
+	config.MigrateID = ""
+	config.MigrateDirection = "up"
+	config.IdleTimeout = idleTimeout
+	config.TokenExpiry = tokenExp
+	config.AuthorizationKey = authKey
+
+	// Переписываем дефолтные env'ами:
 	if runAddr, ok := os.LookupEnv("RUN_ADDRESS"); ok {
 		config.RunAddress = runAddr
 	}
@@ -59,13 +71,13 @@ func parseFlags() *Cfg {
 		config.MigrateDirection = migDir
 	}
 
-	// Поставил флаги после env, так что у флагов теперь приоритет:
-	flag.StringVar(&config.RunAddress, "a", runAddress, "Адрес запуска сервера")
-	flag.StringVar(&config.DatabaseURI, "d", databaseURI, "Адрес подключения к БД")
-	flag.StringVar(&config.AccrualAddress, "r", accrualAddress, "Адрес системы расчёта начислений")
-	flag.BoolVar(&config.DBReinitialize, "dbx", dbReinit, "Реинициализация БД (true/false)")
-	flag.StringVar(&config.MigrateID, "migid", "", "ID миграции БД")
-	flag.StringVar(&config.MigrateDirection, "migdir", "up", "Направление миграции (up/down)")
+	// Преписываем всё флагами:
+	flag.StringVar(&config.RunAddress, "a", config.RunAddress, "Адрес запуска сервера")
+	flag.StringVar(&config.DatabaseURI, "d", config.DatabaseURI, "Адрес подключения к БД")
+	flag.StringVar(&config.AccrualAddress, "r", config.AccrualAddress, "Адрес системы расчёта начислений")
+	flag.BoolVar(&config.DBReinitialize, "dbx", config.DBReinitialize, "Реинициализация БД (true/false)")
+	flag.StringVar(&config.MigrateID, "migid", config.MigrateID, "ID миграции БД")
+	flag.StringVar(&config.MigrateDirection, "migdir", config.MigrateDirection, "Направление миграции (up/down)")
 
 	flag.Parse()
 
