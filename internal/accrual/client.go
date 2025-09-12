@@ -96,10 +96,29 @@ func (c *Client) updateOrderStatus(ctx context.Context, orderNumber string) {
 		logger.Zap.Infow("Order not registered in accrual system yet", "order", orderNumber)
 	case http.StatusTooManyRequests:
 		retryAfter := resp.Header.Get("Retry-After")
-		logger.Zap.Warnw("Accrual system rate limit exceeded", "retry_after", retryAfter)
-		if seconds, err := strconv.Atoi(retryAfter); err == nil {
-			time.Sleep(time.Duration(seconds) * time.Second)
+		logger.Zap.Warnw("Too many requests to accrual system", "order", orderNumber, "retry_after", retryAfter)
+
+		seconds, err := strconv.Atoi(retryAfter)
+		if err != nil {
+			// Если заголовок невалидный, просто выходим
+			return
 		}
+
+		// Создаём таймер, который учитывает отмену контекста
+		timer := time.NewTimer(time.Duration(seconds) * time.Second)
+		defer timer.Stop()
+
+		select {
+		case <-ctx.Done():
+			// Контекст был отменен, пока мы ждали - выходим немедленно
+			logger.Zap.Info("Context cancelled while waiting for retry-after. Aborting.")
+			return
+		case <-timer.C:
+			// Таймер истек, можно продолжать - выходим из функции
+		}
+
+	case http.StatusInternalServerError:
+		logger.Zap.Errorw("Accrual system internal error", "order", orderNumber)
 	default:
 		logger.Zap.Errorw("Received unexpected status from accrual system", "order", orderNumber, "status", resp.StatusCode)
 	}
