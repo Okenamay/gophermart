@@ -189,31 +189,44 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 
 // CreateWithdrawal создает запись о списании в транзакции, проверяя баланс
 func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber string, sum float64) error {
+	// Начинаем транзакцию
 	tx, err := s.DBPool.Begin(ctx)
 	if err != nil {
 		logger.Zap.Errorw("Failed to begin transaction", "error", err)
 		return err
 	}
+
+	// Гарантируем откат транзакции в случае любой ошибки
 	defer tx.Rollback(ctx)
 
+	// Блокируем строку пользователя, чтобы предотвратить параллельные
+	// списания, что заставит другие транзакции ждать завершения текущей
+	lockSQL := `SELECT id FROM users WHERE id = $1 FOR UPDATE`
+	if _, err = tx.Exec(ctx, lockSQL, userID); err != nil {
+		logger.Zap.Errorw("Failed to lock user row", "error", err)
+		return err
+	}
+
+	// Рассчитываем баланс внутри транзакции
 	balance, err := s.getUserBalanceInTx(ctx, tx, userID)
 	if err != nil {
 		// Логирование происходит внутри getUserBalanceInTx
 		return err
 	}
 
+	// Проверяем, достаточно ли средств
 	if balance.Current < sum {
 		return ErrInsufficientFunds
 	}
 
-	_, err = tx.Exec(ctx,
-		"INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)",
-		userID, orderNumber, sum)
-	if err != nil {
+	// Вставляем запись о списании
+	insertSQL := `INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)`
+	if _, err = tx.Exec(ctx, insertSQL, userID, orderNumber, sum); err != nil {
 		logger.Zap.Errorw("Failed to insert withdrawal in transaction", "userID", userID, "error", err)
 		return err
 	}
 
+	// Если все прошло успешно, коммитим транзакцию
 	return tx.Commit(ctx)
 }
 
