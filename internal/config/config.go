@@ -3,7 +3,6 @@ package config
 import (
 	"flag"
 	"os"
-	"strconv"
 	"sync"
 )
 
@@ -20,8 +19,6 @@ const (
 	tokenExp = 24
 	// Ключ для подписи JWT
 	authKey = "secret_key"
-	// Флаг переинициализации БД при старте
-	dbReinit = false
 )
 
 // Cfg определяет структуру конфигурации
@@ -32,9 +29,6 @@ type Cfg struct {
 	IdleTimeout      int
 	TokenExpiry      int
 	AuthorizationKey string
-	DBReinitialize   bool
-	MigrateID        string
-	MigrateDirection string
 }
 
 func parseFlags() *Cfg {
@@ -44,9 +38,6 @@ func parseFlags() *Cfg {
 	config.RunAddress = runAddress
 	config.DatabaseURI = databaseURI
 	config.AccrualAddress = accrualAddress
-	config.DBReinitialize = dbReinit
-	config.MigrateID = ""
-	config.MigrateDirection = "up"
 	config.IdleTimeout = idleTimeout
 	config.TokenExpiry = tokenExp
 	config.AuthorizationKey = authKey
@@ -61,23 +52,11 @@ func parseFlags() *Cfg {
 	if accrualAddr, ok := os.LookupEnv("ACCRUAL_SYSTEM_ADDRESS"); ok {
 		config.AccrualAddress = accrualAddr
 	}
-	if dbReinit, ok := os.LookupEnv("DB_REINIT"); ok {
-		config.DBReinitialize, _ = strconv.ParseBool(dbReinit)
-	}
-	if migID, ok := os.LookupEnv("MIGRATION_ID"); ok {
-		config.MigrateID = migID
-	}
-	if migDir, ok := os.LookupEnv("MIGRATION_DIRECTION"); ok {
-		config.MigrateDirection = migDir
-	}
 
 	// Преписываем всё флагами:
 	flag.StringVar(&config.RunAddress, "a", config.RunAddress, "Адрес запуска сервера")
 	flag.StringVar(&config.DatabaseURI, "d", config.DatabaseURI, "Адрес подключения к БД")
 	flag.StringVar(&config.AccrualAddress, "r", config.AccrualAddress, "Адрес системы расчёта начислений")
-	flag.BoolVar(&config.DBReinitialize, "dbx", config.DBReinitialize, "Реинициализация БД (true/false)")
-	flag.StringVar(&config.MigrateID, "migid", config.MigrateID, "ID миграции БД")
-	flag.StringVar(&config.MigrateDirection, "migdir", config.MigrateDirection, "Направление миграции (up/down)")
 
 	flag.Parse()
 

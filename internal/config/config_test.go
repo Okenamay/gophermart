@@ -39,11 +39,9 @@ func TestInitConfig(t *testing.T) {
 			env:  nil,
 			expected: func() *Cfg {
 				return &Cfg{
-					RunAddress:       runAddress,
-					DatabaseURI:      databaseURI,
-					AccrualAddress:   accrualAddress,
-					DBReinitialize:   dbReinit,
-					MigrateDirection: "up",
+					RunAddress:     runAddress,
+					DatabaseURI:    databaseURI,
+					AccrualAddress: accrualAddress,
 				}
 			},
 		},
@@ -53,11 +51,9 @@ func TestInitConfig(t *testing.T) {
 			env:  nil,
 			expected: func() *Cfg {
 				return &Cfg{
-					RunAddress:       ":9090",
-					DatabaseURI:      "flag-db",
-					AccrualAddress:   "flag-accrual",
-					DBReinitialize:   dbReinit,
-					MigrateDirection: "up",
+					RunAddress:     ":9090",
+					DatabaseURI:    "flag-db",
+					AccrualAddress: "flag-accrual",
 				}
 			},
 		},
@@ -71,11 +67,9 @@ func TestInitConfig(t *testing.T) {
 			},
 			expected: func() *Cfg {
 				return &Cfg{
-					RunAddress:       ":9999",
-					DatabaseURI:      "env-db",
-					AccrualAddress:   "env-accrual",
-					DBReinitialize:   dbReinit,
-					MigrateDirection: "up",
+					RunAddress:     ":9999",
+					DatabaseURI:    "env-db",
+					AccrualAddress: "env-accrual",
 				}
 			},
 		},
@@ -88,11 +82,9 @@ func TestInitConfig(t *testing.T) {
 			},
 			expected: func() *Cfg {
 				return &Cfg{
-					RunAddress:       ":9999",
-					DatabaseURI:      "env-db",
-					AccrualAddress:   accrualAddress,
-					DBReinitialize:   dbReinit,
-					MigrateDirection: "up",
+					RunAddress:     ":9999",
+					DatabaseURI:    "env-db",
+					AccrualAddress: accrualAddress,
 				}
 			},
 		},
@@ -115,8 +107,6 @@ func TestInitConfig(t *testing.T) {
 			assert.Equal(t, expected.RunAddress, conf.RunAddress)
 			assert.Equal(t, expected.DatabaseURI, conf.DatabaseURI)
 			assert.Equal(t, expected.AccrualAddress, conf.AccrualAddress)
-			assert.Equal(t, expected.DBReinitialize, conf.DBReinitialize)
-			assert.Equal(t, expected.MigrateDirection, conf.MigrateDirection)
 		})
 	}
 }

@@ -2,52 +2,43 @@ package migration
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
+	"embed"
 
 	"github.com/Okenamay/gophermart/internal/config"
 	logger "github.com/Okenamay/gophermart/internal/logger/zap"
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 )
 
-// MigrateLauncher запускает процесс миграции или отката
-func MigrateLauncher(ctx context.Context, dbpool *pgxpool.Pool, conf *config.Cfg) error {
-	if conf.MigrateID == "" {
-		logger.Zap.Info("Migration ID is not provided. Skipping.")
-		return nil
+//go:embed migrations/*.sql
+var embedMigrations embed.FS
+
+// MigrateLauncher запускает процесс миграции
+func MigrateLauncher(ctx context.Context, conf *config.Cfg) error {
+
+	db, err := sql.Open("pgx", conf.DatabaseURI)
+	if err != nil {
+		logger.Zap.Errorw("Failed to open DB connection for migration", "error", err)
+		return err
+	}
+	defer db.Close()
+
+	if err := db.PingContext(ctx); err != nil {
+		logger.Zap.Errorw("Failed to ping DB for migration", "error", err)
+		return err
 	}
 
-	logger.Zap.Infow("Attempting to run migration",
-		"id", conf.MigrateID,
-		"direction", conf.MigrateDirection,
-	)
+	goose.SetBaseFS(embedMigrations)
 
-	migration := DeliverMigration(conf)
-	if migration.ID == "" {
-		return fmt.Errorf("unknown migration ID: %s", conf.MigrateID)
+	if err := goose.SetDialect("postgres"); err != nil {
+		logger.Zap.Errorw("Failed to set goose dialect", "error", err)
+		return err
 	}
 
-	var err error
-	var sql string
-
-	switch conf.MigrateDirection {
-	case "up":
-		sql = migration.UpSQL
-		_, err = dbpool.Exec(ctx, sql)
-		if err != nil {
-			logger.Zap.Errorw("Failed to apply migration", "id", migration.ID, "error", err)
-			return err
-		}
-		logger.Zap.Infow("Successfully applied migration", "id", migration.ID)
-	case "down":
-		sql = migration.DownSQL
-		_, err = dbpool.Exec(ctx, sql)
-		if err != nil {
-			logger.Zap.Errorw("Failed to apply rollback", "id", migration.ID, "error", err)
-			return err
-		}
-		logger.Zap.Infow("Successfully applied rollback", "id", migration.ID)
-	default:
-		return fmt.Errorf("incorrect migration direction: %s", conf.MigrateDirection)
+	if err := goose.Up(db, "migrations"); err != nil {
+		logger.Zap.Errorw("Failed to apply migrations", "error", err)
+		return err
 	}
 
 	return nil
