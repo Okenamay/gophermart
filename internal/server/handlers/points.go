@@ -1,0 +1,31 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+
+	logger "github.com/Okenamay/gophermart/internal/logger/zap"
+	"github.com/Okenamay/gophermart/internal/server/middleware"
+)
+
+// PointsBalance возвращает текущий баланс пользователя
+func (h *Handler) PointsBalance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	balance, err := h.DB.GetUserBalance(r.Context(), userID)
+	if err != nil {
+		logger.Zap.Errorw("Failed to get user balance", "userID", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(Balance{
+		Current:   balance.Current,
+		Withdrawn: balance.Withdrawn,
+	})
+}
