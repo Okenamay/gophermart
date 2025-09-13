@@ -26,8 +26,8 @@ func main() {
 	defer db.Close()
 
 	if conf.AccrualAddress != "" {
-		// Передаём зависимость от БД в клиент системы начислений
-		accrualClient := accrual.NewClient(conf.AccrualAddress, db)
+		// Передаём зависимость от БД и конфига в клиент системы начислений
+		accrualClient := accrual.NewClient(conf, db)
 		go accrualClient.StartPolling(ctx)
 	} else {
 		logger.Zap.Warn("ACCRUAL_SYSTEM_ADDRESS is not set. Accrual polling is disabled.")
