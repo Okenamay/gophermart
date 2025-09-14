@@ -2,8 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/Okenamay/gophermart/internal/config"
 	"github.com/Okenamay/gophermart/internal/storage/migration"
@@ -25,7 +23,10 @@ func New(ctx context.Context, conf *config.Cfg, appLogger *zap.SugaredLogger) (*
 		appLogger.Errorw("Failed to connect to database", "error", err)
 		return nil, err
 	}
-	storage := &Storage{DBPool: pool}
+	storage := &Storage{
+		DBPool:    pool,
+		appLogger: appLogger,
+	}
 	if err := storage.Ping(ctx); err != nil {
 		return nil, err
 	}
@@ -43,23 +44,11 @@ func New(ctx context.Context, conf *config.Cfg, appLogger *zap.SugaredLogger) (*
 // Ping проверяет доступность базы данных
 func (s *Storage) Ping(ctx context.Context) error {
 	s.appLogger.Info("Pinging database")
-	if s.DBPool == nil {
-		return fmt.Errorf("database pool is not initialized")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	if err := s.DBPool.Ping(ctx); err != nil {
-		s.appLogger.Errorw("Database ping failed", "error", err)
-		return err
-	}
-	s.appLogger.Info("Database ping successful")
-	return nil
+	return s.DBPool.Ping(ctx)
 }
 
 // Close закрывает пул соединений с базой данных
 func (s *Storage) Close() {
-	if s.DBPool != nil {
-		s.DBPool.Close()
-		s.appLogger.Info("Database connection pool closed.")
-	}
+	s.appLogger.Info("Closing database connection pool")
+	s.DBPool.Close()
 }
