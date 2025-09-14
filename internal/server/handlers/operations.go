@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/Okenamay/gophermart/internal/luhn"
 	"github.com/Okenamay/gophermart/internal/server/middleware"
 	"github.com/Okenamay/gophermart/internal/storage/database"
@@ -36,7 +35,7 @@ func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Insufficient funds", http.StatusPaymentRequired)
 			return
 		}
-		logger.Zap.Errorw("Failed to create withdrawal", "userID", userID, "error", err)
+		h.appLogger.Errorw("Failed to create withdrawal", "userID", userID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +57,7 @@ func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		logger.Zap.Errorw("Failed to get withdrawals", "userID", userID, "error", err)
+		h.appLogger.Errorw("Failed to get withdrawals", "userID", userID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

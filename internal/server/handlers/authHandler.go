@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/Okenamay/gophermart/internal/auth"
-	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/Okenamay/gophermart/internal/storage/database"
 )
 
@@ -25,7 +24,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	passwordHash, err := auth.HashPassword(creds.Password)
 	if err != nil {
-		logger.Zap.Errorw("Failed to hash password", "error", err)
+		h.appLogger.Errorw("Failed to hash password", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -36,14 +35,14 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Login already exists", http.StatusConflict)
 			return
 		}
-		logger.Zap.Errorw("Failed to create user in DB", "error", err)
+		h.appLogger.Errorw("Failed to create user in DB", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	token, err := auth.BuildJWTString(h.Config, userID)
 	if err != nil {
-		logger.Zap.Errorw("Failed to build JWT", "error", err)
+		h.appLogger.Errorw("Failed to build JWT", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -66,7 +65,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 			return
 		}
-		logger.Zap.Errorw("Failed to get user from DB", "error", err)
+		h.appLogger.Errorw("Failed to get user from DB", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +77,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	token, err := auth.BuildJWTString(h.Config, user.ID)
 	if err != nil {
-		logger.Zap.Errorw("Failed to build JWT", "error", err)
+		h.appLogger.Errorw("Failed to build JWT", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

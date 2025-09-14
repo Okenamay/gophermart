@@ -7,15 +7,14 @@ import (
 	"go.uber.org/zap"
 )
 
-var Zap *zap.SugaredLogger
-
-func InitLogger() error {
-	logger, err := zap.NewProduction()
+// InitLogger инициализирует и возвращает новый экземпляр логгера, глобальная
+// переменная Zap больше не используется
+func InitLogger() (*zap.SugaredLogger, error) {
+	appLogger, err := zap.NewProduction()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	Zap = logger.Sugar()
-	return nil
+	return appLogger.Sugar(), nil
 }
 
 type (
@@ -41,24 +40,25 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 }
 
 // WithLogging - middleware для логиррования HTTP запросов
-func WithLogging(h http.Handler) http.Handler {
-	logFn := func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		responseData := &responseData{status: 0, size: 0}
-		lw := loggingResponseWriter{
-			ResponseWriter: w,
-			responseData:   responseData,
-		}
-		h.ServeHTTP(&lw, r)
-		duration := time.Since(start)
+func WithLogging(appLogger *zap.SugaredLogger) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			responseData := &responseData{status: 0, size: 0}
+			lw := loggingResponseWriter{
+				ResponseWriter: w,
+				responseData:   responseData,
+			}
+			h.ServeHTTP(&lw, r)
+			duration := time.Since(start)
 
-		Zap.Infow("Request handled",
-			"uri", r.RequestURI,
-			"method", r.Method,
-			"status", responseData.status,
-			"duration", duration,
-			"size", responseData.size,
-		)
+			appLogger.Infow("Request handled",
+				"uri", r.RequestURI,
+				"method", r.Method,
+				"status", responseData.status,
+				"duration", duration,
+				"size", responseData.size,
+			)
+		})
 	}
-	return http.HandlerFunc(logFn)
 }

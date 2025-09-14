@@ -13,14 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestRegisterUser(t *testing.T) {
 	cfg := &config.Cfg{AuthorizationKey: "test-secret", TokenExpiry: 24}
+	appLogger := zap.NewNop().Sugar()
 
 	t.Run("successful registration", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		creds := UserCredentials{Login: "test", Password: "password"}
 		body, _ := json.Marshal(creds)
@@ -40,7 +42,7 @@ func TestRegisterUser(t *testing.T) {
 
 	t.Run("login conflict", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		creds := UserCredentials{Login: "exists", Password: "password"}
 		body, _ := json.Marshal(creds)
@@ -60,11 +62,12 @@ func TestRegisterUser(t *testing.T) {
 
 func TestLoginUser(t *testing.T) {
 	cfg := &config.Cfg{AuthorizationKey: "test-secret", TokenExpiry: 24}
+	appLogger := zap.NewNop().Sugar()
 	hashedPassword, _ := auth.HashPassword("password")
 
 	t.Run("successful login", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		creds := UserCredentials{Login: "test", Password: "password"}
 		body, _ := json.Marshal(creds)
@@ -85,7 +88,7 @@ func TestLoginUser(t *testing.T) {
 
 	t.Run("user not found", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		creds := UserCredentials{Login: "notfound", Password: "password"}
 		body, _ := json.Marshal(creds)
@@ -104,7 +107,7 @@ func TestLoginUser(t *testing.T) {
 
 	t.Run("wrong password", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		creds := UserCredentials{Login: "test", Password: "wrongpassword"}
 		body, _ := json.Marshal(creds)

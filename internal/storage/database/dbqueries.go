@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -19,17 +18,17 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (i
 		login, passwordHash).Scan(&userID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			logger.Zap.Warnw("Login conflict on user creation", "login", login)
+			s.appLogger.Warnw("Login conflict on user creation", "login", login)
 			return 0, ErrLoginConflict
 		}
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return 0, ErrLoginConflict
 		}
-		logger.Zap.Errorw("Failed to create user", "login", login, "error", err)
+		s.appLogger.Errorw("Failed to create user", "login", login, "error", err)
 		return 0, err
 	}
-	logger.Zap.Infow("Successfully created user", "login", login, "userID", userID)
+	s.appLogger.Infow("Successfully created user", "login", login, "userID", userID)
 	return userID, nil
 }
 
@@ -43,7 +42,7 @@ func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*User, erro
 		if err == pgx.ErrNoRows {
 			return nil, ErrUserNotFound
 		}
-		logger.Zap.Errorw("Failed to get user by login", "login", login, "error", err)
+		s.appLogger.Errorw("Failed to get user by login", "login", login, "error", err)
 		return nil, err
 	}
 	return user, nil
@@ -59,7 +58,7 @@ func (s *Storage) CreateOrder(ctx context.Context, userID int, orderNumber strin
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
 			return ErrOrderConflict
 		}
-		logger.Zap.Errorw("Failed to create order", "orderNumber", orderNumber, "error", err)
+		s.appLogger.Errorw("Failed to create order", "orderNumber", orderNumber, "error", err)
 		return err
 	}
 	return nil
@@ -75,7 +74,7 @@ func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*Order, 
 		if err == pgx.ErrNoRows {
 			return nil, ErrOrderNotFound
 		}
-		logger.Zap.Errorw("Failed to get order by number", "number", number, "error", err)
+		s.appLogger.Errorw("Failed to get order by number", "number", number, "error", err)
 		return nil, err
 	}
 	return order, nil
@@ -87,7 +86,7 @@ func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]Order, err
 		"SELECT number, status, accrual, uploaded_at FROM orders WHERE user_id = $1 ORDER BY uploaded_at ASC",
 		userID)
 	if err != nil {
-		logger.Zap.Errorw("Failed to query user orders", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to query user orders", "userID", userID, "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -96,14 +95,14 @@ func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]Order, err
 	for rows.Next() {
 		var o Order
 		if err := rows.Scan(&o.Number, &o.Status, &o.Accrual, &o.UploadedAt); err != nil {
-			logger.Zap.Errorw("Failed to scan order row", "userID", userID, "error", err)
+			s.appLogger.Errorw("Failed to scan order row", "userID", userID, "error", err)
 			return nil, err
 		}
 		orders = append(orders, o)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.Zap.Errorw("Error iterating user orders rows", "userID", userID, "error", err)
+		s.appLogger.Errorw("Error iterating user orders rows", "userID", userID, "error", err)
 		return nil, err
 	}
 
@@ -119,7 +118,7 @@ func (s *Storage) GetUnprocessedOrders(ctx context.Context) ([]Order, error) {
 	rows, err := s.DBPool.Query(ctx,
 		"SELECT id, number FROM orders WHERE status IN ('NEW', 'PROCESSING')")
 	if err != nil {
-		logger.Zap.Errorw("Failed to query unprocessed orders", "error", err)
+		s.appLogger.Errorw("Failed to query unprocessed orders", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -128,14 +127,14 @@ func (s *Storage) GetUnprocessedOrders(ctx context.Context) ([]Order, error) {
 	for rows.Next() {
 		var o Order
 		if err := rows.Scan(&o.ID, &o.Number); err != nil {
-			logger.Zap.Errorw("Failed to scan unprocessed order row", "error", err)
+			s.appLogger.Errorw("Failed to scan unprocessed order row", "error", err)
 			return nil, err
 		}
 		orders = append(orders, o)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.Zap.Errorw("Error iterating unprocessed orders rows", "error", err)
+		s.appLogger.Errorw("Error iterating unprocessed orders rows", "error", err)
 		return nil, err
 	}
 
@@ -152,7 +151,7 @@ func (s *Storage) UpdateOrder(ctx context.Context, number, status string, accrua
 		"UPDATE orders SET status = $1, accrual = $2 WHERE number = $3",
 		status, accrual, number)
 	if err != nil {
-		logger.Zap.Errorw("Failed to update order", "number", number, "error", err)
+		s.appLogger.Errorw("Failed to update order", "number", number, "error", err)
 		return err
 	}
 	if res.RowsAffected() == 0 {
@@ -168,7 +167,7 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 		"SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'",
 		userID).Scan(&totalAccrual)
 	if err != nil {
-		logger.Zap.Errorw("Failed to calculate total accrual", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to calculate total accrual", "userID", userID, "error", err)
 		return nil, err
 	}
 
@@ -177,7 +176,7 @@ func (s *Storage) GetUserBalance(ctx context.Context, userID int) (*Balance, err
 		"SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1",
 		userID).Scan(&totalWithdrawn)
 	if err != nil {
-		logger.Zap.Errorw("Failed to calculate total withdrawn", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to calculate total withdrawn", "userID", userID, "error", err)
 		return nil, err
 	}
 
@@ -192,7 +191,7 @@ func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber 
 	// Начинаем транзакцию
 	tx, err := s.DBPool.Begin(ctx)
 	if err != nil {
-		logger.Zap.Errorw("Failed to begin transaction", "error", err)
+		s.appLogger.Errorw("Failed to begin transaction", "error", err)
 		return err
 	}
 
@@ -203,7 +202,7 @@ func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber 
 	// списания, что заставит другие транзакции ждать завершения текущей
 	lockSQL := `SELECT id FROM users WHERE id = $1 FOR UPDATE`
 	if _, err = tx.Exec(ctx, lockSQL, userID); err != nil {
-		logger.Zap.Errorw("Failed to lock user row", "error", err)
+		s.appLogger.Errorw("Failed to lock user row", "error", err)
 		return err
 	}
 
@@ -222,7 +221,7 @@ func (s *Storage) CreateWithdrawal(ctx context.Context, userID int, orderNumber 
 	// Вставляем запись о списании
 	insertSQL := `INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)`
 	if _, err = tx.Exec(ctx, insertSQL, userID, orderNumber, sum); err != nil {
-		logger.Zap.Errorw("Failed to insert withdrawal in transaction", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to insert withdrawal in transaction", "userID", userID, "error", err)
 		return err
 	}
 
@@ -235,12 +234,12 @@ func (s *Storage) getUserBalanceInTx(ctx context.Context, tx pgx.Tx, userID int)
 	var totalAccrual, totalWithdrawn float64
 	err := tx.QueryRow(ctx, "SELECT COALESCE(SUM(accrual), 0) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'", userID).Scan(&totalAccrual)
 	if err != nil {
-		logger.Zap.Errorw("Failed to calculate total accrual in transaction", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to calculate total accrual in transaction", "userID", userID, "error", err)
 		return nil, err
 	}
 	err = tx.QueryRow(ctx, "SELECT COALESCE(SUM(sum), 0) FROM withdrawals WHERE user_id = $1", userID).Scan(&totalWithdrawn)
 	if err != nil {
-		logger.Zap.Errorw("Failed to calculate total withdrawn in transaction", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to calculate total withdrawn in transaction", "userID", userID, "error", err)
 		return nil, err
 	}
 	return &Balance{Current: totalAccrual - totalWithdrawn, Withdrawn: totalWithdrawn}, nil
@@ -252,7 +251,7 @@ func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withd
 		"SELECT order_number, sum, processed_at FROM withdrawals WHERE user_id = $1 ORDER BY processed_at ASC",
 		userID)
 	if err != nil {
-		logger.Zap.Errorw("Failed to query user withdrawals", "userID", userID, "error", err)
+		s.appLogger.Errorw("Failed to query user withdrawals", "userID", userID, "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -261,14 +260,14 @@ func (s *Storage) GetWithdrawalsByUser(ctx context.Context, userID int) ([]Withd
 	for rows.Next() {
 		var w Withdrawal
 		if err := rows.Scan(&w.OrderNumber, &w.Sum, &w.ProcessedAt); err != nil {
-			logger.Zap.Errorw("Failed to scan withdrawal row", "userID", userID, "error", err)
+			s.appLogger.Errorw("Failed to scan withdrawal row", "userID", userID, "error", err)
 			return nil, err
 		}
 		withdrawals = append(withdrawals, w)
 	}
 
 	if err := rows.Err(); err != nil {
-		logger.Zap.Errorw("Error iterating withdrawals rows", "userID", userID, "error", err)
+		s.appLogger.Errorw("Error iterating withdrawals rows", "userID", userID, "error", err)
 		return nil, err
 	}
 

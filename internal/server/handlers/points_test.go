@@ -13,15 +13,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestPointsBalance(t *testing.T) {
 	cfg := &config.Cfg{}
+	appLogger := zap.NewNop().Sugar()
 	userID := 123
 
 	t.Run("successful balance retrieval", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		req, err := http.NewRequest(http.MethodGet, "/api/user/balance", nil)
 		require.NoError(t, err)

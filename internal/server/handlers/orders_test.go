@@ -15,15 +15,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestAddOrder(t *testing.T) {
 	cfg := &config.Cfg{}
+	appLogger := zap.NewNop().Sugar()
 	userID := 123
 
 	t.Run("successful order upload", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 		orderNumber := "9278923470"
 
 		req, err := http.NewRequest(http.MethodPost, "/api/user/orders", bytes.NewBufferString(orderNumber))
@@ -44,7 +46,7 @@ func TestAddOrder(t *testing.T) {
 
 	t.Run("order already uploaded by self", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 		orderNumber := "9278923470"
 
 		req, err := http.NewRequest(http.MethodPost, "/api/user/orders", bytes.NewBufferString(orderNumber))
@@ -65,7 +67,7 @@ func TestAddOrder(t *testing.T) {
 
 	t.Run("order uploaded by another user", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 		orderNumber := "9278923470"
 
 		req, err := http.NewRequest(http.MethodPost, "/api/user/orders", bytes.NewBufferString(orderNumber))
@@ -85,7 +87,7 @@ func TestAddOrder(t *testing.T) {
 	})
 
 	t.Run("invalid order number format", func(t *testing.T) {
-		handler := New(cfg, nil)
+		handler := New(cfg, nil, appLogger)
 		orderNumber := "123"
 
 		req, err := http.NewRequest(http.MethodPost, "/api/user/orders", bytes.NewBufferString(orderNumber))
@@ -103,11 +105,12 @@ func TestAddOrder(t *testing.T) {
 
 func TestListOrders(t *testing.T) {
 	cfg := &config.Cfg{}
+	appLogger := zap.NewNop().Sugar()
 	userID := 123
 
 	t.Run("user has orders", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		req, err := http.NewRequest(http.MethodGet, "/api/user/orders", nil)
 		require.NoError(t, err)
@@ -136,7 +139,7 @@ func TestListOrders(t *testing.T) {
 
 	t.Run("user has no orders", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		req, err := http.NewRequest(http.MethodGet, "/api/user/orders", nil)
 		require.NoError(t, err)

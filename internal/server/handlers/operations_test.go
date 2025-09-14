@@ -15,15 +15,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestPointsWithdraw(t *testing.T) {
 	cfg := &config.Cfg{}
+	appLogger := zap.NewNop().Sugar()
 	userID := 123
 
 	t.Run("successful withdrawal", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		reqBody := WithdrawalRequest{Order: "2377225624", Sum: 100}
 		body, _ := json.Marshal(reqBody)
@@ -44,7 +46,7 @@ func TestPointsWithdraw(t *testing.T) {
 
 	t.Run("insufficient funds", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		reqBody := WithdrawalRequest{Order: "2377225624", Sum: 1000}
 		body, _ := json.Marshal(reqBody)
@@ -66,11 +68,12 @@ func TestPointsWithdraw(t *testing.T) {
 
 func TestListWithdrawals(t *testing.T) {
 	cfg := &config.Cfg{}
+	appLogger := zap.NewNop().Sugar()
 	userID := 123
 
 	t.Run("user has withdrawals", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		req, err := http.NewRequest(http.MethodGet, "/api/user/withdrawals", nil)
 		require.NoError(t, err)
@@ -96,7 +99,7 @@ func TestListWithdrawals(t *testing.T) {
 
 	t.Run("user has no withdrawals", func(t *testing.T) {
 		mockStorage := new(MockStorage)
-		handler := New(cfg, mockStorage)
+		handler := New(cfg, mockStorage, appLogger)
 
 		req, err := http.NewRequest(http.MethodGet, "/api/user/withdrawals", nil)
 		require.NoError(t, err)

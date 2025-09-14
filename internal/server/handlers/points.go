@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	logger "github.com/Okenamay/gophermart/internal/logger/zap"
 	"github.com/Okenamay/gophermart/internal/server/middleware"
 )
 
@@ -18,7 +17,7 @@ func (h *Handler) PointsBalance(w http.ResponseWriter, r *http.Request) {
 
 	balance, err := h.DB.GetUserBalance(r.Context(), userID)
 	if err != nil {
-		logger.Zap.Errorw("Failed to get user balance", "userID", userID, "error", err)
+		h.appLogger.Errorw("Failed to get user balance", "userID", userID, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

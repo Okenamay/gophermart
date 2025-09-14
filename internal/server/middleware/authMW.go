@@ -7,7 +7,7 @@ import (
 
 	"github.com/Okenamay/gophermart/internal/auth"
 	"github.com/Okenamay/gophermart/internal/config"
-	logger "github.com/Okenamay/gophermart/internal/logger/zap"
+	"go.uber.org/zap"
 )
 
 type contextKey string
@@ -16,19 +16,19 @@ type contextKey string
 const UserIDContextKey = contextKey("userID")
 
 // Authenticator - middleware для проверки JWT-токена
-func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
+func Authenticator(conf *config.Cfg, logger *zap.SugaredLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				logger.Zap.Warn("Authorization header is missing")
+				logger.Warn("Authorization header is missing")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
 			headerParts := strings.Split(authHeader, " ")
 			if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-				logger.Zap.Warn("Invalid Authorization header format")
+				logger.Warn("Invalid Authorization header format")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -36,7 +36,7 @@ func Authenticator(conf *config.Cfg) func(http.Handler) http.Handler {
 			tokenString := headerParts[1]
 			userID, err := auth.GetUserIDFromToken(conf, tokenString)
 			if err != nil {
-				logger.Zap.Warnw("Invalid token", "error", err)
+				logger.Warnw("Invalid token", "error", err)
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}

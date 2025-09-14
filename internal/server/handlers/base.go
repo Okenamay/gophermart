@@ -5,6 +5,7 @@ import (
 
 	"github.com/Okenamay/gophermart/internal/config"
 	"github.com/Okenamay/gophermart/internal/storage/database"
+	"go.uber.org/zap"
 )
 
 // Storage определяет интерфейс для всех операций с БД, которые нужны хендлерам
@@ -21,14 +22,16 @@ type Storage interface {
 
 // Handler - структура для хранения зависимостей хендлеров
 type Handler struct {
-	Config *config.Cfg
-	DB     Storage
+	Config    *config.Cfg
+	DB        Storage
+	appLogger *zap.SugaredLogger
 }
 
 // New создает новый экземпляр Handler
-func New(cfg *config.Cfg, db Storage) *Handler {
+func New(cfg *config.Cfg, db Storage, appLogger *zap.SugaredLogger) *Handler {
 	return &Handler{
-		Config: cfg,
-		DB:     db,
+		Config:    cfg,
+		DB:        db,
+		appLogger: appLogger,
 	}
 }
