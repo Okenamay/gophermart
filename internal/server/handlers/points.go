@@ -11,6 +11,7 @@ import (
 func (h *Handler) PointsBalance(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
+		h.appLogger.Errorw("Failed to access User ID", "userID", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

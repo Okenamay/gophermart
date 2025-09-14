@@ -13,11 +13,13 @@ import (
 func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	var creds UserCredentials
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		h.appLogger.Infow("Invalid request format", "json", err)
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
 	if creds.Login == "" || creds.Password == "" {
+		h.appLogger.Infow("Login and password must not be empty", "login", "empty credentials")
 		http.Error(w, "Login and password must not be empty", http.StatusBadRequest)
 		return
 	}
@@ -32,6 +34,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.DB.CreateUser(r.Context(), creds.Login, passwordHash)
 	if err != nil {
 		if errors.Is(err, database.ErrLoginConflict) {
+			h.appLogger.Infow("Login already exists", "dblogin", err)
 			http.Error(w, "Login already exists", http.StatusConflict)
 			return
 		}
@@ -55,6 +58,7 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	var creds UserCredentials
 	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		h.appLogger.Infow("Invalid request format", "json", err)
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
@@ -62,6 +66,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	user, err := h.DB.GetUserByLogin(r.Context(), creds.Login)
 	if err != nil {
 		if errors.Is(err, database.ErrUserNotFound) {
+			h.appLogger.Infow("Invalid login or password", "login", err)
 			http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 			return
 		}
@@ -71,6 +76,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !auth.CheckPasswordHash(creds.Password, user.PasswordHash) {
+		h.appLogger.Infow("Invalid login or password", "login")
 		http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 		return
 	}

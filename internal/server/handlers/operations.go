@@ -14,17 +14,20 @@ import (
 func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
+		h.appLogger.Errorw("Failed to access User ID", "userID", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	var req WithdrawalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.appLogger.Infow("Invalid request format", "json", err)
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
 	if !luhn.IsValidString(req.Order) {
+		h.appLogger.Infow("Invalid order number format", "luhn")
 		http.Error(w, "Invalid order number format", http.StatusUnprocessableEntity)
 		return
 	}
@@ -32,6 +35,7 @@ func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 	err := h.DB.CreateWithdrawal(r.Context(), userID, req.Order, req.Sum)
 	if err != nil {
 		if errors.Is(err, database.ErrInsufficientFunds) {
+			h.appLogger.Infow("Insufficient funds", "balance", err)
 			http.Error(w, "Insufficient funds", http.StatusPaymentRequired)
 			return
 		}
@@ -47,6 +51,7 @@ func (h *Handler) PointsWithdraw(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(int)
 	if !ok {
+		h.appLogger.Errorw("Failed to access User ID", "userID", userID)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
